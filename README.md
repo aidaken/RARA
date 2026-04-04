@@ -1,6 +1,6 @@
 # Role Automation Risk Auditor
 
-Most people only get headlines about AI and jobs. This MVP gives a task-level exposure analysis with evidence and a concrete next step.
+Most people only get headlines about AI and jobs. This tool gives a task-level exposure analysis with evidence and a concrete next step.
 
 It takes a job title + plain-English description, then runs two Claude calls:
 1. Extract 6-10 concrete tasks with time share.

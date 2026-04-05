@@ -34,6 +34,7 @@ Open [http://localhost:4173](http://localhost:4173).
 ## Demo
 
 [Watch demo video](demo/RARA.ScreenRecording.mov)
+[Open raw video file](https://github.com/aidaken/RARA/raw/main/demo/RARA.ScreenRecording.mov)
 
 ## Next Improvements
 

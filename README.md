@@ -31,6 +31,10 @@ Open [http://localhost:4173](http://localhost:4173).
 
 ![Role Automation Risk Auditor](assets/og-image.png)
 
+## Demo
+
+[Watch demo video](demo/RARA.ScreenRecording.mov)
+
 ## Next Improvements
 
 1. Add a no-key demo mode with sample outputs so anyone can try it instantly.

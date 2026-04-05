@@ -70,3 +70,8 @@ temp/
 .cache/
 coverage/
 .nyc_output/
+
+# Local demo artifacts (large recordings)
+demo/raw/
+*.ScreenRecording.*
+!demo/RARA.ScreenRecording.mov

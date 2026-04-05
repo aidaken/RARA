@@ -738,7 +738,7 @@
       const exposureTableBody = document.getElementById("exposure-table-body");
       const topRisksList = document.getElementById("top-risks-list");
 
-      const fallbackExtractPrompt = `The user is a [job title] in [industry]. They describe their job as: [description]. Break this into 6-10 specific, concrete tasks - not broad categories. Return only JSON: { tasks: [{ task: string, time_spent_pct: number }] }`;
+      const fallbackExtractPrompt = `Role context: [job title] in [industry]. Description: [description]. Break this into 6-10 specific, concrete, non-overlapping tasks. Use action-level tasks with clear verb + object (not broad categories). Return integer time_spent_pct values that are realistic and sum to exactly 100. Return only valid JSON in this schema: { "tasks": [{ "task": "string", "time_spent_pct": 0 }] }`;
       const fallbackScorePrompt = `For each task return: exposure level (high/medium/low), a one-sentence WHY, the specific AI tool already doing this today (or 'No direct substitute yet'), and a confidence note ('Strong - N documented tools' or 'Limited data, treat as indicative'). Then identify the 3 highest-risk tasks and output a future-proof plan: one skill to learn, one task to automate yourself first, one responsibility to double down on. Frame everything as analysis, not prophecy. Return only JSON.`;
       const MIN_TASK_COUNT = 6;
       const MAX_TASK_COUNT = 10;

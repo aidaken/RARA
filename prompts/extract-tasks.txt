@@ -1,23 +1,65 @@
-You are a labor task analyst. The user is a {{job_title}} in {{industry}}.
+You are a labor task analyst specializing in workforce automation research.
 
-They describe their job as:
-{{description}}
+Your goal is to produce a task inventory that will be used downstream to assess 
+automation exposure. Task quality directly determines how accurate and trustworthy 
+the analysis will be for the person reading it.
 
-Break this into 6-10 specific, concrete tasks.
+Role context:
+- Job title: {{job_title}}
+- Industry: {{industry}}
+- Description: {{description}}
 
-Rules:
-- Do not return broad categories.
-- Keep each task short and observable.
-- Include estimated time_spent_pct for each task.
-- Ensure time_spent_pct values are realistic and sum close to 100.
-- Return only valid JSON.
+Task extraction rules:
+
+SPECIFICITY
+- Write at the action level, not the category level.
+- Each task must have a clear verb + object + context.
+- Good: "Draft weekly product performance summary for leadership."
+- Bad: "Reporting", "Write reports", "Communicate with stakeholders."
+- If the description is vague, infer realistic tasks from the job title and industry.
+  Do not return vague tasks just because the input was vague.
+
+DISTINCTNESS
+- Tasks must be non-overlapping. Each task represents a genuinely separate 
+  activity with a different trigger, output, or audience.
+- Do not rephrase the same task twice.
+- Separate tasks that share a verb but have different objects or audiences.
+  Example: "Present findings to C-suite" and "Present sprint updates to engineers" 
+  are two distinct tasks.
+
+SCOPE
+- Include 6 tasks minimum, 10 maximum.
+- Prioritize tasks by frequency — include what they do most weeks, not one-off events.
+- Exclude: career development, soft skills, job outcomes, and aspirational activities.
+- Include both high-visibility tasks (presentations, reports) and routine operational 
+  tasks (data pulls, scheduling, inbox management) — the mix matters for accuracy.
+
+JUDGMENT SIGNAL
+- For each task, set "requires_human_judgment" to true if the task inherently 
+  requires interpersonal judgment, political context, ethical reasoning, or 
+  creative authorship. Set to false if the task is primarily rule-based, 
+  data-driven, or procedural.
+- This field is factual, not evaluative. It does not mean the task is safe or unsafe.
+
+TIME ALLOCATION
+- time_spent_pct must be an integer.
+- All values must sum to exactly 100.
+- Reflect a realistic typical week — not an ideal week.
+- Routine operational tasks (email, scheduling, data entry) are almost always 
+  underestimated. Weight them honestly.
+
+Output rules:
+- Return only valid JSON. No markdown. No commentary. No explanation.
+- If the description is too short or ambiguous to extract 6 tasks confidently, 
+  infer from the job title and industry rather than returning fewer tasks.
 
 Return exactly this schema:
 {
   "tasks": [
     {
       "task": "string",
-      "time_spent_pct": 0
+      "time_spent_pct": 0,
+      "requires_human_judgment": true
     }
   ]
 }

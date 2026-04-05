@@ -516,9 +516,17 @@
                   <input
                     id="model-name"
                     type="text"
-                    value="claude-3-5-sonnet-latest"
+                    value="claude-sonnet-4-6"
+                    list="claude-model-options"
                     required
                   />
+                  <datalist id="claude-model-options">
+                    <option value="claude-sonnet-4-6"></option>
+                    <option value="claude-opus-4-6"></option>
+                    <option value="claude-sonnet-4-5"></option>
+                    <option value="claude-haiku-4-5"></option>
+                  </datalist>
+                  <small class="muted">Use model ID format, not display name.</small>
                 </label>
               </div>
 
@@ -682,7 +690,7 @@
       const state = {
         input: {
           apiKey: "",
-          model: "claude-3-5-sonnet-latest",
+          model: "claude-sonnet-4-6",
           jobTitle: "",
           industry: "",
           description: "",
@@ -712,6 +720,18 @@
       const fallbackScorePrompt = `For each task return: exposure level (high/medium/low), a one-sentence WHY, the specific AI tool already doing this today (or 'No direct substitute yet'), and a confidence note ('Strong - N documented tools' or 'Limited data, treat as indicative'). Then identify the 3 highest-risk tasks and output a future-proof plan: one skill to learn, one task to automate yourself first, one responsibility to double down on. Frame everything as analysis, not prophecy. Return only JSON.`;
       const MIN_TASK_COUNT = 6;
       const MAX_TASK_COUNT = 10;
+      const MODEL_ALIASES = {
+        "claude sonnet 4.6": "claude-sonnet-4-6",
+        "sonnet 4.6": "claude-sonnet-4-6",
+        "claude-sonnet-4.6": "claude-sonnet-4-6",
+        "claude opus 4.6": "claude-opus-4-6",
+        "opus 4.6": "claude-opus-4-6",
+        "claude-opus-4.6": "claude-opus-4-6",
+        "claude sonnet 4.5": "claude-sonnet-4-5",
+        "sonnet 4.5": "claude-sonnet-4-5",
+        "claude haiku 4.5": "claude-haiku-4-5",
+        "haiku 4.5": "claude-haiku-4-5",
+      };
 
       function taskKey(task) {
         return String(task || "")
@@ -737,6 +757,9 @@
 
       function getFriendlyError(error, fallbackMessage) {
         const message = String(error?.message || fallbackMessage || "Request failed.");
+        if (message.toLowerCase().startsWith("model:")) {
+          return "Invalid model value. Use an API model ID like claude-sonnet-4-6.";
+        }
         if (
           message.includes("Failed to fetch") ||
           message.includes("NetworkError") ||
@@ -745,6 +768,12 @@
           return "Network error. Check your internet connection and try again.";
         }
         return message;
+      }
+
+      function normalizeModelInput(rawValue) {
+        const raw = String(rawValue || "").trim();
+        const key = raw.toLowerCase();
+        return MODEL_ALIASES[key] || raw;
       }
 
       function setScreen(nextId) {
@@ -1098,7 +1127,10 @@
           clearError();
 
           state.input.apiKey = document.getElementById("api-key").value.trim();
-          state.input.model = document.getElementById("model-name").value.trim();
+          state.input.model = normalizeModelInput(
+            document.getElementById("model-name").value,
+          );
+          document.getElementById("model-name").value = state.input.model;
           state.input.jobTitle = document.getElementById("job-title").value.trim();
           state.input.industry = document.getElementById("industry").value.trim();
           state.input.description = document

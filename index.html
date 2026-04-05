@@ -819,8 +819,21 @@
         if (message.toLowerCase().startsWith("model:")) {
           return "Invalid model value. Use model IDs like claude-sonnet-4-6, gpt-5.4, sonar-pro, or gemini-2.5-pro.";
         }
+        if (message.toLowerCase().includes("api key")) {
+          return "API key looks invalid for the selected provider. Double-check the key and try again.";
+        }
+        if (
+          message.includes("Unauthorized") ||
+          message.includes("401") ||
+          message.includes("invalid x-api-key")
+        ) {
+          return "Authentication failed. Check that your API key matches the selected provider.";
+        }
         if (message.includes("does not exist")) {
           return "Model not found for this provider. Pick a valid model ID from the list.";
+        }
+        if (message.includes("permission") || message.includes("access")) {
+          return "You do not have access to this model on your account. Try another model.";
         }
         if (
           message.includes("Failed to fetch") ||
@@ -840,6 +853,52 @@
         if (provider === "perplexity") aliases = PERPLEXITY_MODEL_ALIASES;
         if (provider === "gemini") aliases = GEMINI_MODEL_ALIASES;
         return aliases[key] || raw;
+      }
+
+      function validateProviderInputs(provider, apiKey, model) {
+        const key = String(apiKey || "").trim();
+        const modelId = String(model || "").trim();
+        if (!key || !modelId) {
+          return "API key and model are required.";
+        }
+
+        if (provider === "anthropic") {
+          if (!key.startsWith("sk-ant-")) {
+            return "Anthropic keys start with sk-ant-. Switch provider or key.";
+          }
+          if (!modelId.startsWith("claude-")) {
+            return "Anthropic model IDs start with claude- (example: claude-sonnet-4-6).";
+          }
+        }
+
+        if (provider === "openai") {
+          if (!key.startsWith("sk-")) {
+            return "OpenAI keys usually start with sk-.";
+          }
+          if (!modelId.startsWith("gpt-")) {
+            return "OpenAI model IDs usually start with gpt- (example: gpt-5.4).";
+          }
+        }
+
+        if (provider === "perplexity") {
+          if (!key.startsWith("pplx-")) {
+            return "Perplexity keys start with pplx-.";
+          }
+          if (!modelId.startsWith("sonar")) {
+            return "Perplexity model IDs use sonar* (example: sonar-pro).";
+          }
+        }
+
+        if (provider === "gemini") {
+          if (!key.startsWith("AIza")) {
+            return "Gemini API keys from AI Studio usually start with AIza.";
+          }
+          if (!modelId.startsWith("gemini-")) {
+            return "Gemini model IDs start with gemini- (example: gemini-2.5-pro).";
+          }
+        }
+
+        return null;
       }
 
       function syncProviderUI(provider, resetModel) {
@@ -959,11 +1018,22 @@
           throw new Error(errorText);
         }
 
-        const text = payload?.choices?.[0]?.message?.content;
-        if (typeof text !== "string" || !text.trim()) {
-          throw new Error("No text content returned by OpenAI.");
+        const content = payload?.choices?.[0]?.message?.content;
+        if (typeof content === "string" && content.trim()) {
+          return content;
         }
-        return text;
+        if (Array.isArray(content)) {
+          const text = content
+            .map((item) => {
+              if (typeof item === "string") return item;
+              if (typeof item?.text === "string") return item.text;
+              return "";
+            })
+            .join("\n")
+            .trim();
+          if (text) return text;
+        }
+        throw new Error("No text content returned by OpenAI.");
       }
 
       async function callPerplexity({
@@ -1361,8 +1431,13 @@
             .getElementById("description")
             .value.trim();
 
-          if (!state.input.apiKey || !state.input.model) {
-            showError("API key and model are required.");
+          const validationError = validateProviderInputs(
+            state.input.provider,
+            state.input.apiKey,
+            state.input.model,
+          );
+          if (validationError) {
+            showError(validationError);
             return;
           }
 
@@ -1402,6 +1477,25 @@
         .getElementById("analyze-exposure")
         .addEventListener("click", async () => {
           clearError();
+
+          state.input.provider = providerInput.value || state.input.provider;
+          state.input.apiKey = apiKeyInput.value.trim();
+          state.input.model = normalizeModelInput(
+            state.input.provider,
+            modelInput.value,
+          );
+          modelInput.value = state.input.model;
+
+          const validationError = validateProviderInputs(
+            state.input.provider,
+            state.input.apiKey,
+            state.input.model,
+          );
+          if (validationError) {
+            showError(validationError);
+            return;
+          }
+
           if (!state.tasks.length) {
             showError("No tasks available to analyze.");
             return;

@@ -1,12 +1,23 @@
 # Role Automation Risk Auditor
 
-Most people only get headlines about AI and jobs. This tool gives a task-level exposure analysis with evidence and a concrete next step.
+This is a fun side project, not a product claim.
 
-It takes a job title + plain-English description, then runs two LLM calls (Anthropic, OpenAI, Perplexity, or Gemini):
-1. Extract 6-10 concrete tasks with time share.
-2. Score each task as high/medium/low exposure, with a one-line WHY, confidence note, and named AI tool already doing it (or "No direct substitute yet").
+It takes a job title + plain-English role description, breaks the role into tasks, then analyzes each task by automation exposure:
+- `high` / `medium` / `low`
+- one-line WHY
+- confidence note
+- named AI tool already doing it (or "No direct substitute yet")
 
-Output ends with a future-proof plan: one skill to learn, one task to automate first, and one responsibility to double down on.
+It ends with a practical 3-step plan:
+- one skill to learn
+- one task to automate first
+- one responsibility to double down on
+
+Supported providers:
+- Anthropic
+- OpenAI
+- Perplexity
+- Gemini
 
 ## Run
 
@@ -20,7 +31,11 @@ Open [http://localhost:4173](http://localhost:4173).
 
 ![Role Automation Risk Auditor](assets/og-image.png)
 
-## Next
+## Next Improvements
 
-V2: industry benchmarking and resume mode.  
-V3: team mode for managers with a collective exposure map.
+1. Add a no-key demo mode with sample outputs so anyone can try it instantly.
+2. Add a lightweight backend proxy + rate limits for public testing.
+3. Add citations/links for each "AI doing it now" claim.
+4. Improve task extraction quality with role-specific prompt variants.
+5. Add one-click share card export for LinkedIn posts.
+6. Add side-by-side comparison for two different roles.

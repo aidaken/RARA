@@ -2,7 +2,7 @@
 
 Most people only get headlines about AI and jobs. This tool gives a task-level exposure analysis with evidence and a concrete next step.
 
-It takes a job title + plain-English description, then runs two Claude calls:
+It takes a job title + plain-English description, then runs two LLM calls (Anthropic, OpenAI, Perplexity, or Gemini):
 1. Extract 6-10 concrete tasks with time share.
 2. Score each task as high/medium/low exposure, with a one-line WHY, confidence note, and named AI tool already doing it (or "No direct substitute yet").
 

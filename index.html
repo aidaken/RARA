@@ -496,13 +496,22 @@
           <div class="panel">
             <h2>Role Input</h2>
             <p class="muted">
-              Enter your current role details. This app runs two Claude calls and
+              Enter your current role details. This app runs two model calls and
               keeps all logic in-browser.
             </p>
             <form id="role-form" class="field-stack">
               <div class="field-grid">
                 <label>
-                  Anthropic API key
+                  AI provider
+                  <select id="provider-name">
+                    <option value="anthropic">Anthropic (Claude)</option>
+                    <option value="openai">OpenAI (ChatGPT)</option>
+                    <option value="perplexity">Perplexity</option>
+                    <option value="gemini">Google Gemini</option>
+                  </select>
+                </label>
+                <label>
+                  API key
                   <input
                     id="api-key"
                     type="password"
@@ -512,19 +521,28 @@
                   />
                 </label>
                 <label>
-                  Claude model
+                  Model
                   <input
                     id="model-name"
                     type="text"
                     value="claude-sonnet-4-6"
-                    list="claude-model-options"
+                    list="model-options"
                     required
                   />
-                  <datalist id="claude-model-options">
+                  <datalist id="model-options">
                     <option value="claude-sonnet-4-6"></option>
                     <option value="claude-opus-4-6"></option>
                     <option value="claude-sonnet-4-5"></option>
                     <option value="claude-haiku-4-5"></option>
+                    <option value="gpt-5.4"></option>
+                    <option value="gpt-5.4-mini"></option>
+                    <option value="gpt-4.1-mini"></option>
+                    <option value="gpt-4.1"></option>
+                    <option value="sonar-pro"></option>
+                    <option value="sonar"></option>
+                    <option value="sonar-reasoning-pro"></option>
+                    <option value="gemini-2.5-pro"></option>
+                    <option value="gemini-2.5-flash"></option>
                   </datalist>
                   <small class="muted">Use model ID format, not display name.</small>
                 </label>
@@ -689,6 +707,7 @@
     <script>
       const state = {
         input: {
+          provider: "anthropic",
           apiKey: "",
           model: "claude-sonnet-4-6",
           jobTitle: "",
@@ -709,9 +728,12 @@
       ];
 
       const stepElements = Array.from(document.querySelectorAll(".step"));
+      const providerInput = document.getElementById("provider-name");
       const loadingBox = document.getElementById("loading-box");
       const loadingText = document.getElementById("loading-text");
       const errorBox = document.getElementById("error-box");
+      const apiKeyInput = document.getElementById("api-key");
+      const modelInput = document.getElementById("model-name");
       const tasksTableBody = document.getElementById("tasks-table-body");
       const exposureTableBody = document.getElementById("exposure-table-body");
       const topRisksList = document.getElementById("top-risks-list");
@@ -720,7 +742,25 @@
       const fallbackScorePrompt = `For each task return: exposure level (high/medium/low), a one-sentence WHY, the specific AI tool already doing this today (or 'No direct substitute yet'), and a confidence note ('Strong - N documented tools' or 'Limited data, treat as indicative'). Then identify the 3 highest-risk tasks and output a future-proof plan: one skill to learn, one task to automate yourself first, one responsibility to double down on. Frame everything as analysis, not prophecy. Return only JSON.`;
       const MIN_TASK_COUNT = 6;
       const MAX_TASK_COUNT = 10;
-      const MODEL_ALIASES = {
+      const PROVIDER_DEFAULTS = {
+        anthropic: {
+          keyPlaceholder: "sk-ant-...",
+          model: "claude-sonnet-4-6",
+        },
+        openai: {
+          keyPlaceholder: "sk-proj-...",
+          model: "gpt-5.4",
+        },
+        perplexity: {
+          keyPlaceholder: "pplx-...",
+          model: "sonar-pro",
+        },
+        gemini: {
+          keyPlaceholder: "AIza...",
+          model: "gemini-2.5-pro",
+        },
+      };
+      const ANTHROPIC_MODEL_ALIASES = {
         "claude sonnet 4.6": "claude-sonnet-4-6",
         "sonnet 4.6": "claude-sonnet-4-6",
         "claude-sonnet-4.6": "claude-sonnet-4-6",
@@ -731,6 +771,25 @@
         "sonnet 4.5": "claude-sonnet-4-5",
         "claude haiku 4.5": "claude-haiku-4-5",
         "haiku 4.5": "claude-haiku-4-5",
+      };
+      const OPENAI_MODEL_ALIASES = {
+        "chatgpt 5.4": "gpt-5.4",
+        "chatgpt 5.4 mini": "gpt-5.4-mini",
+        "gpt 5.4": "gpt-5.4",
+        "gpt 5.4 mini": "gpt-5.4-mini",
+        "gpt-5.4mini": "gpt-5.4-mini",
+        "gpt 4.1": "gpt-4.1",
+        "gpt 4.1 mini": "gpt-4.1-mini",
+        "gpt-4.1mini": "gpt-4.1-mini",
+      };
+      const PERPLEXITY_MODEL_ALIASES = {
+        "sonar pro": "sonar-pro",
+        "sonar reasoning pro": "sonar-reasoning-pro",
+      };
+      const GEMINI_MODEL_ALIASES = {
+        "gemini 2.5 pro": "gemini-2.5-pro",
+        "gemini 2.5 flash": "gemini-2.5-flash",
+        "gemini pro": "gemini-2.5-pro",
       };
 
       function taskKey(task) {
@@ -758,7 +817,10 @@
       function getFriendlyError(error, fallbackMessage) {
         const message = String(error?.message || fallbackMessage || "Request failed.");
         if (message.toLowerCase().startsWith("model:")) {
-          return "Invalid model value. Use an API model ID like claude-sonnet-4-6.";
+          return "Invalid model value. Use model IDs like claude-sonnet-4-6, gpt-5.4, sonar-pro, or gemini-2.5-pro.";
+        }
+        if (message.includes("does not exist")) {
+          return "Model not found for this provider. Pick a valid model ID from the list.";
         }
         if (
           message.includes("Failed to fetch") ||
@@ -770,11 +832,30 @@
         return message;
       }
 
-      function normalizeModelInput(rawValue) {
+      function normalizeModelInput(provider, rawValue) {
         const raw = String(rawValue || "").trim();
         const key = raw.toLowerCase();
-        return MODEL_ALIASES[key] || raw;
+        let aliases = ANTHROPIC_MODEL_ALIASES;
+        if (provider === "openai") aliases = OPENAI_MODEL_ALIASES;
+        if (provider === "perplexity") aliases = PERPLEXITY_MODEL_ALIASES;
+        if (provider === "gemini") aliases = GEMINI_MODEL_ALIASES;
+        return aliases[key] || raw;
       }
+
+      function syncProviderUI(provider, resetModel) {
+        const defaults = PROVIDER_DEFAULTS[provider] || PROVIDER_DEFAULTS.anthropic;
+        apiKeyInput.placeholder = defaults.keyPlaceholder;
+        if (resetModel) {
+          modelInput.value = defaults.model;
+        }
+      }
+
+      providerInput.addEventListener("change", () => {
+        const provider = providerInput.value || "anthropic";
+        state.input.provider = provider;
+        syncProviderUI(provider, true);
+      });
+      syncProviderUI(providerInput.value || "anthropic", false);
 
       function setScreen(nextId) {
         screens.forEach((id, index) => {
@@ -824,7 +905,7 @@
           .replace(/\{\{tasks_json\}\}/g, vars.tasksJson || "[]");
       }
 
-      async function callClaude({ apiKey, model, userPrompt, maxTokens = 1300 }) {
+      async function callAnthropic({ apiKey, model, userPrompt, maxTokens = 1300 }) {
         const response = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
           headers: {
@@ -856,6 +937,145 @@
         return textBlock.text;
       }
 
+      async function callOpenAI({ apiKey, model, userPrompt, maxTokens = 1300 }) {
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model,
+            temperature: 0.2,
+            max_tokens: maxTokens,
+            messages: [{ role: "user", content: userPrompt }],
+          }),
+        });
+
+        const payload = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          const errorText = payload?.error?.message || "OpenAI request failed.";
+          throw new Error(errorText);
+        }
+
+        const text = payload?.choices?.[0]?.message?.content;
+        if (typeof text !== "string" || !text.trim()) {
+          throw new Error("No text content returned by OpenAI.");
+        }
+        return text;
+      }
+
+      async function callPerplexity({
+        apiKey,
+        model,
+        userPrompt,
+        maxTokens = 1300,
+      }) {
+        const response = await fetch(
+          "https://api.perplexity.ai/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              model,
+              temperature: 0.2,
+              max_tokens: maxTokens,
+              messages: [{ role: "user", content: userPrompt }],
+            }),
+          },
+        );
+
+        const payload = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          const errorText = payload?.error?.message || "Perplexity request failed.";
+          throw new Error(errorText);
+        }
+
+        const content = payload?.choices?.[0]?.message?.content;
+        if (typeof content === "string" && content.trim()) {
+          return content;
+        }
+        if (Array.isArray(content)) {
+          const text = content
+            .map((item) => (typeof item?.text === "string" ? item.text : ""))
+            .join("\n")
+            .trim();
+          if (text) return text;
+        }
+
+        throw new Error("No text content returned by Perplexity.");
+      }
+
+      async function callGemini({ apiKey, model, userPrompt, maxTokens = 1300 }) {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+          model,
+        )}:generateContent?key=${encodeURIComponent(apiKey)}`;
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            generationConfig: {
+              temperature: 0.2,
+              maxOutputTokens: maxTokens,
+            },
+            contents: [
+              {
+                role: "user",
+                parts: [{ text: userPrompt }],
+              },
+            ],
+          }),
+        });
+
+        const payload = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          const errorText =
+            payload?.error?.message || "Gemini request failed.";
+          throw new Error(errorText);
+        }
+
+        const parts = payload?.candidates?.[0]?.content?.parts;
+        if (!Array.isArray(parts)) {
+          throw new Error("No text content returned by Gemini.");
+        }
+
+        const text = parts
+          .map((part) => (typeof part?.text === "string" ? part.text : ""))
+          .join("\n")
+          .trim();
+        if (!text) {
+          throw new Error("No text content returned by Gemini.");
+        }
+        return text;
+      }
+
+      async function callModel({
+        provider,
+        apiKey,
+        model,
+        userPrompt,
+        maxTokens = 1300,
+      }) {
+        if (provider === "openai") {
+          return callOpenAI({ apiKey, model, userPrompt, maxTokens });
+        }
+        if (provider === "perplexity") {
+          return callPerplexity({ apiKey, model, userPrompt, maxTokens });
+        }
+        if (provider === "gemini") {
+          return callGemini({ apiKey, model, userPrompt, maxTokens });
+        }
+        return callAnthropic({ apiKey, model, userPrompt, maxTokens });
+      }
+
       function parseJsonFromModel(rawText) {
         if (typeof rawText !== "string") {
           throw new Error("Model output was not text.");
@@ -877,8 +1097,9 @@
         }
       }
 
-      async function extractTasksWithRetry({ apiKey, model, prompt }) {
-        const firstPass = await callClaude({
+      async function extractTasksWithRetry({ provider, apiKey, model, prompt }) {
+        const firstPass = await callModel({
+          provider,
           apiKey,
           model,
           userPrompt: prompt,
@@ -894,7 +1115,8 @@
         }
 
         const retryPrompt = `${prompt}\n\nYour previous output had ${parsed.length} tasks. Retry and return exactly ${MIN_TASK_COUNT}-${MAX_TASK_COUNT} specific, concrete tasks in valid JSON only.`;
-        const secondPass = await callClaude({
+        const secondPass = await callModel({
+          provider,
           apiKey,
           model,
           userPrompt: retryPrompt,
@@ -1126,11 +1348,13 @@
           event.preventDefault();
           clearError();
 
-          state.input.apiKey = document.getElementById("api-key").value.trim();
+          state.input.provider = providerInput.value || "anthropic";
+          state.input.apiKey = apiKeyInput.value.trim();
           state.input.model = normalizeModelInput(
-            document.getElementById("model-name").value,
+            state.input.provider,
+            modelInput.value,
           );
-          document.getElementById("model-name").value = state.input.model;
+          modelInput.value = state.input.model;
           state.input.jobTitle = document.getElementById("job-title").value.trim();
           state.input.industry = document.getElementById("industry").value.trim();
           state.input.description = document
@@ -1138,7 +1362,7 @@
             .value.trim();
 
           if (!state.input.apiKey || !state.input.model) {
-            showError("Anthropic API key and model are required.");
+            showError("API key and model are required.");
             return;
           }
 
@@ -1160,6 +1384,7 @@
             });
 
             state.tasks = await extractTasksWithRetry({
+              provider: state.input.provider,
               apiKey: state.input.apiKey,
               model: state.input.model,
               prompt,
@@ -1196,7 +1421,8 @@
               tasksJson: JSON.stringify(state.tasks),
             });
 
-            const rawText = await callClaude({
+            const rawText = await callModel({
+              provider: state.input.provider,
               apiKey: state.input.apiKey,
               model: state.input.model,
               userPrompt: prompt,
